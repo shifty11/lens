@@ -14,8 +14,33 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	bankTypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	distTypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
+	govTypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	transfertypes "github.com/cosmos/ibc-go/v3/modules/apps/transfer/types"
 )
+
+func (cc *ChainClient) QueryGovProposals(ctx context.Context, proposalStatus govTypes.ProposalStatus) ([]govTypes.Proposal, error) {
+	p := &govTypes.QueryProposalsRequest{ProposalStatus: proposalStatus, Pagination: DefaultPageRequest()}
+	queryClient := govTypes.NewQueryClient(cc)
+
+	res, err := queryClient.Proposals(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Proposals, nil
+}
+
+func (cc *ChainClient) QueryGovProposal(ctx context.Context, proposalId uint64) (*govTypes.Proposal, error) {
+	p := &govTypes.QueryProposalRequest{ProposalId: proposalId}
+	queryClient := govTypes.NewQueryClient(cc)
+
+	res, err := queryClient.Proposal(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res.Proposal, nil
+}
 
 // queryBalanceWithAddress returns the amount of coins in the relayer account with address as input
 // TODO add pagination support
