@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/spf13/viper"
 	"os"
 	"path"
 
@@ -98,8 +99,8 @@ func initConfig(cmd *cobra.Command, a *appState, o map[string]ClientOverrides) e
 	}
 
 	debug, err := cmd.Flags().GetBool("debug")
-	if err != nil {
-		return err
+	if err != nil { // TODO: handle this hack better
+		debug = false
 	}
 
 	cfgPath := path.Join(home, "config.yaml")
@@ -182,4 +183,18 @@ func initConfig(cmd *cobra.Command, a *appState, o map[string]ClientOverrides) e
 		return fmt.Errorf("error validating config: %w", err)
 	}
 	return nil
+}
+
+var globalState *appState
+
+func GetConfig(reload bool, log *zap.Logger) (*Config, error) {
+	var err error
+	if globalState == nil || reload {
+		globalState = &appState{
+			Log:   log,
+			Viper: viper.New(),
+		}
+		err = initConfig(NewRootCmd(log, zap.NewAtomicLevel(), nil), globalState, nil)
+	}
+	return globalState.Config, err
 }
