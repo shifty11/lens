@@ -18,8 +18,8 @@ import (
 	transfertypes "github.com/cosmos/ibc-go/v3/modules/apps/transfer/types"
 )
 
-func (cc *ChainClient) QueryGovProposals(ctx context.Context, proposalStatus govTypes.ProposalStatus) (*govTypes.QueryProposalsResponse, error) {
-	p := &govTypes.QueryProposalsRequest{ProposalStatus: proposalStatus, Pagination: DefaultPageRequest()}
+func (cc *ChainClient) QueryGovProposals(ctx context.Context, proposalStatus govTypes.ProposalStatus, pageRequest *query.PageRequest) (*govTypes.QueryProposalsResponse, error) {
+	p := &govTypes.QueryProposalsRequest{ProposalStatus: proposalStatus, Pagination: pageRequest}
 	queryClient := govTypes.NewQueryClient(cc)
 
 	res, err := queryClient.Proposals(ctx, p)
