@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/x/authz"
 	"strings"
 
 	"github.com/avast/retry-go/v4"
@@ -14,6 +15,7 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	abci "github.com/tendermint/tendermint/abci/types"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	"google.golang.org/grpc/codes"
@@ -67,6 +69,60 @@ func (cc *ChainClient) SendMsgs(ctx context.Context, msgs []sdk.Msg) (*sdk.TxRes
 
 	// Set the gas amount on the transaction factory
 	txf = txf.WithGas(adjusted)
+
+	// Build the transaction builder
+	txb, err := tx.BuildUnsignedTx(txf, msgs...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Attach the signature to the transaction
+	// c.LogFailedTx(nil, err, msgs)
+	// Force encoding in the chain specific address
+	for _, msg := range msgs {
+		cc.Codec.Marshaler.MustMarshalJSON(msg)
+	}
+
+	done := cc.SetSDKContext()
+	if err = tx.Sign(txf, cc.Config.Key, txb, false); err != nil {
+		return nil, err
+	}
+	done()
+
+	// Generate the transaction bytes
+	txBytes, err := cc.Codec.TxConfig.TxEncoder()(txb.GetTx())
+	if err != nil {
+		return nil, err
+	}
+
+	// Broadcast those bytes
+	res, err := cc.BroadcastTx(ctx, txBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// transaction was executed, log the success or failure using the tx response code
+	// NOTE: error is nil, logic should use the returned error to determine if the
+	// transaction was successfully executed.
+	if res.Code != 0 {
+		return res, fmt.Errorf("transaction failed with code: %d", res.Code)
+	}
+
+	return res, nil
+}
+
+func (cc *ChainClient) SendMsgWithGas(ctx context.Context, msg sdk.Msg, gas uint64) (*sdk.TxResponse, error) {
+	return cc.SendMsgsWithGas(ctx, []sdk.Msg{msg}, gas)
+}
+
+func (cc *ChainClient) SendMsgsWithGas(ctx context.Context, msgs []sdk.Msg, gas uint64) (*sdk.TxResponse, error) {
+	txf, err := cc.PrepareFactory(cc.TxFactory())
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the gas amount on the transaction factory
+	txf = txf.WithGas(gas)
 
 	// Build the transaction builder
 	txb, err := tx.BuildUnsignedTx(txf, msgs...)
@@ -295,4 +351,19 @@ func BuildSimTx(txf tx.Factory, msgs ...sdk.Msg) ([]byte, error) {
 
 	simReq := txtypes.SimulateRequest{Tx: protoProvider.GetProtoTx()}
 	return simReq.Marshal()
+}
+
+func (cc *ChainClient) ExecAuthzVote(ctx context.Context, voters []string, grantee string, proposalID uint64, option govtypes.VoteOption, gas uint64) (*sdk.TxResponse, error) {
+	granteeAddress, err := cc.DecodeBech32AccAddr(grantee)
+	if err != nil {
+		return nil, err
+	}
+
+	var msgs []sdk.Msg
+	for _, voter := range voters {
+		msgs = append(msgs, &govtypes.MsgVote{ProposalId: proposalID, Voter: voter, Option: option})
+	}
+	msgExec := authz.NewMsgExec(granteeAddress, msgs)
+	msgExec.Grantee = grantee
+	return cc.SendMsgWithGas(ctx, &msgExec, gas)
 }

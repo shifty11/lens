@@ -12,11 +12,29 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/cosmos/cosmos-sdk/x/authz"
 	bankTypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	distTypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	govTypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	transfertypes "github.com/cosmos/ibc-go/v3/modules/apps/transfer/types"
 )
+
+func (cc *ChainClient) QueryAuthzGrants(ctx context.Context, granter string, grantee string, msgTypeUrl string, pagination *query.PageRequest) ([]*authz.Grant, error) {
+	p := &authz.QueryGrantsRequest{
+		Granter:    granter,
+		Grantee:    grantee,
+		MsgTypeUrl: msgTypeUrl,
+		Pagination: pagination,
+	}
+	queryClient := authz.NewQueryClient(cc)
+
+	res, err := queryClient.Grants(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.GetGrants(), nil
+}
 
 func (cc *ChainClient) QueryGovProposals(ctx context.Context, proposalStatus govTypes.ProposalStatus, pageRequest *query.PageRequest) (*govTypes.QueryProposalsResponse, error) {
 	p := &govTypes.QueryProposalsRequest{ProposalStatus: proposalStatus, Pagination: pageRequest}
