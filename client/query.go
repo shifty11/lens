@@ -36,6 +36,18 @@ func (cc *ChainClient) QueryAuthzGrants(ctx context.Context, granter string, gra
 	return res.GetGrants(), nil
 }
 
+func (cc *ChainClient) QueryGovVote(ctx context.Context, proposalId uint64, voter string) (*govTypes.Vote, error) {
+	p := &govTypes.QueryVoteRequest{ProposalId: proposalId, Voter: voter}
+	queryClient := govTypes.NewQueryClient(cc)
+
+	res, err := queryClient.Vote(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res.Vote, nil
+}
+
 func (cc *ChainClient) QueryGovProposals(ctx context.Context, proposalStatus govTypes.ProposalStatus, pageRequest *query.PageRequest) (*govTypes.QueryProposalsResponse, error) {
 	p := &govTypes.QueryProposalsRequest{ProposalStatus: proposalStatus, Pagination: pageRequest}
 	queryClient := govTypes.NewQueryClient(cc)
